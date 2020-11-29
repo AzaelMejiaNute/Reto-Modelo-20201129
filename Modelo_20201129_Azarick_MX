@@ -1,0 +1,379 @@
+####   PROYECTO MODELO 20201129  ########################################################
+
+install.packages("geosphere")
+install.packages("spdep")
+install.packages("Cluster")
+install.packages("factoextra")
+
+require(geosphere)
+require(spdep)
+require(cluster)
+require(factoextra)
+
+
+base_0 <- read.csv("ubicaciones.csv")
+
+base_1 <- base_0[base_0$Vol_Entrega != 0,]
+
+mat_dist_0 <- as.data.frame(distm(as.matrix(base_1[,c(6,5)]), fun = distHaversine))
+
+colnames(mat_dist_0) <- c(base_1$ï..Id_Cliente)
+rownames(mat_dist_0) <- c(base_1$ï..Id_Cliente)
+
+
+plot(base_1[,c(6,5)])
+points(base_1[base_1$Frecuencia ==3,c(6,5)], col = "red", lwd= 5)
+points(base_1[base_1$Frecuencia ==2,c(6,5)], col = "blue", lwd= 5)
+
+
+lon_0_m <- mean(base_1[base_1$Frecuencia == 3,6])
+lat_0_m <- mean(base_1[base_1$Frecuencia == 3,5])
+
+med_1 <- (base_1[,c(6,5)] - c(lon_0_m, lat_0_m))^2
+
+base_1[med_1[,2] == min(med_1[,2]),1]
+       
+prueb_0 <- cbind(as.data.frame(t(mat_dist_0[c(as.character(base_1[med_1[,2] == min(med_1[,2]),1])),])),base_1$Vol_Entrega)
+
+param_0 <- data.frame(matrix(0,dim(mat_dist_0)[1],1))
+  
+param_0[which(base_1$Frecuencia == 3),] <- 1
+  
+
+while (sum(param_0 * prueb_0[,2]) >= sum(base_1$Vol_Entrega * base_1$Frecuencia)/6  & sum(param_0) >= sum(base_1$Frecuencia)/6) {
+  
+  param_0[which(prueb_0[,1] == max(param_0 * prueb_0[,1])),] <- 0
+  
+}
+
+param_aux_0  <- 1-param_0
+
+while (sum((param_0) * prueb_0[,2]) < sum(base_1$Vol_Entrega * base_1$Frecuencia)/6 | sum(param_0) < sum(base_1$Frecuencia)/6) {
+  
+  param_0[which(prueb_0[,1] == min((param_aux_0 * prueb_0[,1])[(param_aux_0 * prueb_0[,1]) != 0,])),] <- 1
+  param_aux_0[which(prueb_0[,1] == min((param_aux_0 * prueb_0[,1])[(param_aux_0 * prueb_0[,1]) != 0,])),] <- 0
+  
+}
+
+
+base_1$Cluster1 <- data.frame("Cluster1" = matrix(0, nrow(base_1),1))
+
+base_1[c(which(param_0 == 1)),7] <- 1
+
+plot(base_1[,c(6,5)], col = "White")
+points(base_1[base_1$Cluster1 == 1,c(6,5)], col = "red", lwd = 3)
+points(base_1[base_1$Cluster1 == 0,c(6,5)])
+points(base_1[base_1$Frecuencia > 1,c(6,5)], col = "Blue", lwd = 5)
+
+base_1$Fre_mod_1 <- matrix(0,nrow(base_1),1)
+
+base_1[base_1$Cluster1 == 1,8] <- base_1[base_1$Cluster1 == 1,3]-1
+base_1[base_1$Cluster1 != 1,8] <- base_1[base_1$Cluster1 != 1,3]
+
+base_2 <- base_1[base_1$Fre_mod_1 != 0,]
+
+plot(base_2[,c(6,5)])
+points(base_2[base_2$Fre_mod_1>1,c(6,5)], col= "red", lwd = 5)
+
+mat_dist <- as.data.frame(distm(as.matrix(base_2[,c(6,5)]), fun = distHaversine))
+
+colnames(mat_dist) <- c(base_2$ï..Id_Cliente)
+rownames(mat_dist) <- c(base_2$ï..Id_Cliente)
+
+plot(base_2[,c(6,5)])
+
+k_1 <- pam(base_2[,c(6,5)],5,metric = "manhattan")
+
+base_2$PAM2 <- k_1$clustering
+
+met <- base_2[base_2$lon == min(base_2$lon),]
+
+medoid_ini <- met[met$lat == min(met$lat),]
+
+param <- data.frame(matrix(0,dim(mat_dist)[1],1))
+
+param[which(base_2$PAM2 == medoid_ini$PAM2),] <- 1
+
+
+mi_lon <- mean(base_2[base_2$PAM2 == medoid_ini$PAM2,6])
+
+mi_lat <- mean(base_2[base_2$PAM2 == medoid_ini$PAM2,5])
+
+med_2 <- (base_2[,c(6,5)] - c(mi_lon, mi_lat))^2
+base_2[med_2[,1] == min(med_2[,1]),]
+prueb <- cbind(as.data.frame(t(mat_dist[c(as.character(base_2[med_2[,1] == min(med_2[,1]),1])),])),base_2$Vol_Entrega)
+
+while (sum(param * prueb[,2]) >= sum(base_1$Vol_Entrega * base_1$Frecuencia)/6  & sum(param) >= sum(base_1$Frecuencia)/6) {
+  
+  param[which(prueb[,1] == max(param * prueb[,1])),] <- 0
+  
+}
+
+param_aux  <- 1-param
+
+while (sum(param * prueb[,2]) < sum(base_1$Vol_Entrega * base_1$Frecuencia)/6 | sum(param) < sum(base_1$Frecuencia)/6) {
+  
+  param[which(prueb[,1] == min((param_aux * prueb[,1])[(param_aux * prueb[,1]) != 0,])),] <- 1
+  param_aux[which(prueb[,1] == min((param_aux * prueb[,1])[(param_aux * prueb[,1]) != 0,])),] <- 0
+  
+  
+}
+
+base_2$Cluster2 <- data.frame("Cluster2" = matrix(0, nrow(base_2),1))
+
+base_2[c(which(param == 1)),10] <- 1
+
+base_2[base_2$Cluster2 == 1,c(6,5)]
+
+plot(base_2[,c(6,5)], col = "White")
+points(base_2[base_2$Cluster2 == 1,c(6,5)], col = "red", lwd = 3)
+points(base_2[base_2$Cluster2 == 0,c(6,5)])
+points(base_2[base_2$PAM2 == medoid_ini$PAM2,c(6,5)], col = "blue",lwd = 5) 
+
+base_2$Fre_mod_2 <- matrix(0,nrow(base_2),1)
+
+base_2[base_2$Cluster2 == 1,11] <- base_2[base_2$Cluster2 == 1,8]-1
+base_2[base_2$Cluster2 != 1,11] <- base_2[base_2$Cluster2 != 1,8]
+
+base_3 <- base_2[base_2$Fre_mod_2 != 0,]
+
+plot(base_3[,c(6,5)])
+points(base_3[base_3$Fre_mod_2>1,c(6,5)], col = "Red", lwd = 5)
+
+mat_dist_2 <- as.data.frame(distm(as.matrix(base_3[,c(6,5)]), fun = distHaversine))
+
+colnames(mat_dist_2) <- c(base_3$ï..Id_Cliente)
+rownames(mat_dist_2) <- c(base_3$ï..Id_Cliente)
+
+
+k_2 <- pam(base_3[,c(6,5)],4,metric = "manhattan")
+
+base_3$PAM3 <- k_2$clustering
+
+met_1 <- base_3[base_3$lon == max(base_3$lon),]
+
+medoid_1 <- met_1[met_1$lat == min(met_1$lat),]
+
+param_1 <- data.frame(matrix(0,dim(mat_dist_2)[1],1))
+
+param_1[which(base_3$PAM3 == medoid_1$PAM3),] <- 1
+
+mi_lon_1 <- medoid_1$lon
+
+mi_lat_1 <- medoid_1$lat
+
+med_3 <- (base_3[,c(6,5)] - c(mi_lon_1, mi_lat_1))^2
+
+prueb_2 <- cbind(as.data.frame(t(mat_dist_2[c(as.character(base_3[med_3[,1] == min(med_3[,1]),1])),])),base_3$Vol_Entrega)
+
+
+while (sum(param_1 * prueb_2[,2]) >= sum(base_1$Vol_Entrega * base_1$Frecuencia)/6 & sum(param_1) >= sum(base_1$Frecuencia)/6){
+  
+  param_1[which(prueb_2[,1] == max(param_1 * prueb_2[,1])),] <- 0
+  
+}
+
+param_aux_1  <- 1-param_1
+
+while (sum(param_1 * prueb_2[,2]) < sum(base_1$Vol_Entrega * base_1$Frecuencia)/6 | sum(param_1) < sum(base_1$Frecuencia)/6) {
+  
+  param_1[which(prueb_2[,1] == min((param_aux_1 * prueb_2[,1])[(param_aux_1 * prueb_2[,1]) != 0,])),] <- 1
+  param_aux_1[which(prueb_2[,1] == min((param_aux_1 * prueb_2[,1])[(param_aux_1 * prueb_2[,1]) != 0,])),] <- 0
+  
+  
+}
+    
+base_3$Cluster3 <- data.frame("Cluster3" = matrix(0, nrow(base_3),1))
+
+base_3[c(which(param_1 == 1)),13] <- 1
+
+plot(base_3[,c(6,5)], col = "White")
+points(base_3[base_3$Cluster3 == 1,c(6,5)], col = "red", lwd = 3)
+points(base_3[base_3$Cluster3 == 0,c(6,5)])
+points(base_3[base_3$PAM3 == medoid_1$PAM3,c(6,5)], col = "blue",lwd = 5) 
+
+
+sum(param * base_1$Vol_Entrega)
+nrow(base_1[base_1$Cluster1 == 1,])
+
+base_3$Fre_mod_3 <- matrix(0,nrow(base_3),1)
+
+base_3[base_3$Cluster3 == 1,14] <- base_3[base_3$Cluster3 == 1,11]-1
+base_3[base_3$Cluster3 != 1,14] <- base_3[base_3$Cluster3 != 1,11]
+
+base_4 <- base_3[base_3$Fre_mod_3 != 0,]
+
+plot(base_4[,c(6,5)])
+points(base_4[base_4$Fre_mod_3 >1,c(6,5)], col = "red", lwd = 5)
+
+mat_dist_3 <- as.data.frame(distm(as.matrix(base_4[,c(6,5)]), fun = distHaversine))
+
+colnames(mat_dist_3) <- c(base_4$ï..Id_Cliente)
+rownames(mat_dist_3) <- c(base_4$ï..Id_Cliente)
+
+k_3 <- pam(base_4[,c(6,5)],3,metric = "manhattan")
+
+base_4$PAM4 <- k_3$clustering
+
+met_2 <- base_4[base_4$lon == min(base_4$lon),]
+
+medoid_2 <- met_2[met_2$lat == max(met_2$lat),]
+
+param_2 <- data.frame(matrix(0,dim(mat_dist_3)[1],1))
+
+param_2[which(base_4$PAM4 == medoid_2$PAM4),] <- 1
+
+mi_lon_2 <- medoid_2$lon
+
+mi_lat_2 <- medoid_2$lat
+
+med_4 <- (base_4[,c(6,5)] - c(mi_lon_2, mi_lat_2))^2
+
+prueb_3 <- cbind(as.data.frame(t(mat_dist_3[c(as.character(base_4[med_4[,1] == min(med_4[,1]),1])),])),base_4$Vol_Entrega)
+
+while (sum(param_2 * prueb_3[,2]) >= sum(base_1$Vol_Entrega * base_1$Frecuencia)/6  & sum(param_2) >= sum(base_1$Frecuencia)/6){
+  
+  param_2[which(prueb_3[,1] == max(param_2 * prueb_3[,1])),] <- 0
+  
+}
+
+param_aux_2  <- 1-param_2
+
+while (sum(param_2 * prueb_3[,2]) < sum(base_1$Vol_Entrega * base_1$Frecuencia)/6  | sum(param_2) < sum(base_1$Frecuencia)/6) {
+  
+  param_2[which(prueb_3[,1] == min((param_aux_2 * prueb_3[,1])[(param_aux_2 * prueb_3[,1]) != 0,])),] <- 1
+  param_aux_2[which(prueb_3[,1] == min((param_aux_2 * prueb_3[,1])[(param_aux_2 * prueb_3[,1]) != 0,])),] <- 0
+  
+  
+}
+
+base_4$Cluster4 <- data.frame("Cluster4" = matrix(0, nrow(base_4),1))
+
+base_4[c(which(param_2 == 1)),16] <- 1
+
+
+
+plot(base_4[,c(6,5)], col = "White")
+points(base_4[base_4$Cluster4 == 1,c(6,5)], col = "red", lwd = 3)
+points(base_4[base_4$Cluster4 == 0,c(6,5)])
+points(base_4[base_4$PAM4 == 1,c(6,5)], col = "blue",lwd = 5) 
+
+
+base_4$Fre_mod_4 <- matrix(0,nrow(base_4),1)
+
+base_4[base_4$Cluster4 == 1,17] <- base_4[base_4$Cluster4 == 1,14]-1
+base_4[base_4$Cluster4 != 1,17] <- base_4[base_4$Cluster4 != 1,14]
+
+base_5 <- base_4[base_4$Fre_mod_4 != 0,]
+
+plot(base_5[,c(6,5)])
+points(base_5[base_5$Fre_mod_4 > 1,c(6,5)], col ="red", lwd = 5)
+
+mat_dist_4 <- as.data.frame(distm(as.matrix(base_5[,c(6,5)]), fun = distHaversine))
+
+colnames(mat_dist_4) <- c(base_5$ï..Id_Cliente)
+rownames(mat_dist_4) <- c(base_5$ï..Id_Cliente)
+
+
+k_4 <- pam(base_5[,c(6,5)],3,metric = "manhattan")
+
+base_5$PAM5 <- k_4$clustering
+
+met_3 <- base_5[base_5$lon == min(base_5$lon),]
+
+medoid_3 <- met_3[met_3$lat == min(met_3$lat),]
+
+param_3 <- data.frame(matrix(0,dim(mat_dist_4)[1],1))
+
+param_3[which(base_5$Fre_mod_4>1),] <- 1
+
+mi_lon_3 <- medoid_3$lon
+
+mi_lat_3 <- medoid_3$lat
+
+med_5 <- (base_5[,c(6,5)] - c(mi_lon_3, mi_lat_3))^2
+
+
+prueb_4 <- cbind(as.data.frame(t(mat_dist_4[c(as.character(base_5[med_5[,1] == min(med_5[,1]),1])),])),base_5$Vol_Entrega)
+
+
+
+while (sum(param_3 * prueb_4[,2]) >= sum(base_1$Vol_Entrega * base_1$Frecuencia)/6  & sum(param_3) >= sum(base_1$Frecuencia)/6){
+  
+  param_3[which(prueb_4[,1] == max(param_3 * prueb_4[,1])),] <- 0
+  
+}
+
+
+param_aux_3  <- 1-param_3
+
+
+while (sum(param_3 * prueb_4[,2]) < sum(base_1$Vol_Entrega * base_1$Frecuencia)/6  | sum(param_3) < sum(base_1$Frecuencia)/6) {
+  
+  param_3[which(prueb_4[,1] == min((param_aux_3 * prueb_4[,1])[(param_aux_3 * prueb_4[,1]) != 0,])),] <- 1
+  param_aux_3[which(prueb_4[,1] == min((param_aux_3 * prueb_4[,1])[(param_aux_3 * prueb_4[,1]) != 0,])),] <- 0
+  
+  
+}
+
+
+base_5$Cluster5 <- data.frame("Cluster5" = matrix(0, nrow(base_5),1))
+
+
+base_5[c(which(param_3 == 1)),19] <- 1
+
+
+plot(base_5[,c(6,5)], col = "White")
+points(base_5[base_5$Cluster5 == 1,c(6,5)], col = "red", lwd = 3)
+points(base_5[base_5$Cluster5 == 0,c(6,5)])
+points(base_5[base_5$PAM5 == medoid_3$PAM5,c(6,5)], col = "blue",lwd = 5) 
+
+
+base_5$Fre_mod_5 <- matrix(0,nrow(base_5),1)
+
+base_5[base_5$Cluster5 == 1,20] <- base_5[base_5$Cluster5 == 1,17]-1
+base_5[base_5$Cluster5 != 1,20] <- base_5[base_5$Cluster5 != 1,17]
+
+base_6 <- base_5[base_5$Fre_mod_5 != 0,]
+
+
+base_6$Cluster6 <- data.frame("Cluster6" = matrix(1, nrow(base_6),1))
+
+plot(base_6[,c(6,5)])
+base_6[base_6$Fre_mod_5 >1,]
+
+
+base_0$Cluster1 <- data.frame("Cluster1" = matrix(0, nrow(base_0),1))
+base_0$Cluster2 <- data.frame("Cluster2" = matrix(0, nrow(base_0),1))
+base_0$Cluster3 <- data.frame("Cluster3" = matrix(0, nrow(base_0),1))
+base_0$Cluster4 <- data.frame("Cluster4" = matrix(0, nrow(base_0),1))
+base_0$Cluster5 <- data.frame("Cluster5" = matrix(0, nrow(base_0),1))
+base_0$Cluster6 <- data.frame("Cluster6" = matrix(0, nrow(base_0),1))
+
+base_0[c(as.character(base_1$ï..Id_Cliente)),7] <- as.matrix(base_1$Cluster1)
+base_0[c(as.character(base_2$ï..Id_Cliente)),8] <- as.matrix(base_2$Cluster2)
+base_0[c(as.character(base_3$ï..Id_Cliente)),9] <- as.matrix(base_3$Cluster3)
+base_0[c(as.character(base_4$ï..Id_Cliente)),10] <- as.matrix(base_4$Cluster4)
+base_0[c(as.character(base_5$ï..Id_Cliente)),11] <- as.matrix(base_5$Cluster5)
+base_0[c(as.character(base_6$ï..Id_Cliente)),12] <- as.matrix(base_6$Cluster6)
+
+
+
+output_C <- data.frame(base_0$ï..Id_Cliente, base_0$id_Agencia, base_0$Frecuencia, base_0$Vol_Entrega, base_0$lon, base_0$lat, 
+                     base_0$Cluster1, base_0$Cluster2, base_0$Cluster3, base_0$Cluster4, base_0$Cluster5, base_0$Cluster6)
+
+
+
+output <- data.frame(base_0$ï..Id_Cliente, 
+                     base_0$Cluster1, 
+                     base_0$Cluster2, 
+                     base_0$Cluster3, 
+                     base_0$Cluster4, 
+                     base_0$Cluster5, 
+                     base_0$Cluster6)
+
+
+
+write.csv(output_C, file = "Output completo.csv")
+
+write.csv(output, file = "Output.csv")
